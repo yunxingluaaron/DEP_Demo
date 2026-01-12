@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, Play, RotateCcw, TrendingUp, X, Info, CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertCircle, Play, RotateCcw, TrendingUp, X, Info, CheckCircle, XCircle, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown } from 'lucide-react';
 
 const ABDecisionPredictor = () => {
   const [formData, setFormData] = useState({
@@ -23,6 +23,17 @@ const ABDecisionPredictor = () => {
     basic: true,
     tools: false
   });
+
+  // Human feedback state
+  const [feedbackRequired, setFeedbackRequired] = useState(false);
+  const [feedback, setFeedback] = useState({
+    rating: null, // 'thumbsup' or 'thumbsdown'
+    reason: ''
+  });
+  const [feedbackError, setFeedbackError] = useState('');
+  
+  // Event history tracking
+  const [eventHistory, setEventHistory] = useState([]);
 
   const obstructionClasses = [
     'CASING_ISSUES',
@@ -93,6 +104,105 @@ const ABDecisionPredictor = () => {
           : [...currentTools, tool]
       };
     });
+  };
+
+  const handleFeedbackRating = (rating) => {
+    setFeedback(prev => ({
+      ...prev,
+      rating: rating
+    }));
+    setFeedbackError('');
+  };
+
+  const handleFeedbackReason = (e) => {
+    setFeedback(prev => ({
+      ...prev,
+      reason: e.target.value
+    }));
+    setFeedbackError('');
+  };
+
+  const validateFeedback = () => {
+    if (!feedback.rating) {
+      setFeedbackError('Please select thumbs up or thumbs down');
+      return false;
+    }
+    
+    if (feedback.rating === 'thumbsdown' && !feedback.reason.trim()) {
+      setFeedbackError('Please provide a reason for disagreeing with the prediction');
+      return false;
+    }
+    
+    return true;
+  };
+
+  const submitFeedback = async () => {
+    if (!validateFeedback()) {
+      return;
+    }
+
+    setLoading(true);
+    setFeedbackError('');
+    
+    // Simulate API call with delay
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    try {
+      // Store feedback data locally (dummy storage for now - backend will handle later)
+      const feedbackData = {
+        timestamp: new Date().toISOString(),
+        case_id: formData.case_id,
+        prediction: result.recommendation,
+        feedback_rating: feedback.rating,
+        feedback_reason: feedback.reason,
+        depth_reached: parseFloat(formData.depth_reached),
+        event_duration: parseFloat(formData.event_duration),
+        obstruction_class: formData.obstruction_class,
+        deployment_method: formData.deployment_method,
+        tools_used: formData.tools_used
+      };
+      
+      // Log to console for now (backend will store this later)
+      console.log('Feedback submitted (dummy storage):', feedbackData);
+      
+      // Update the last event in history with feedback
+      setEventHistory(prev => {
+        const updated = [...prev];
+        if (updated.length > 0) {
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            feedback_rating: feedback.rating,
+            feedback_reason: feedback.reason,
+            feedback_timestamp: new Date().toISOString()
+          };
+        }
+        return updated;
+      });
+      
+      // Simulate successful submission
+      // Reset feedback and allow next event
+      setFeedbackRequired(false);
+      setFeedback({
+        rating: null,
+        reason: ''
+      });
+      
+      // Reset event form for next entry
+      setFormData(prev => ({
+        ...prev,
+        depth_reached: '',
+        event_duration: '',
+        tools_used: [],
+        confidence: 'medium'
+      }));
+      
+      setResult(null);
+      
+    } catch (err) {
+      setFeedbackError('An error occurred while submitting feedback');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const startNewCase = async () => {
@@ -169,6 +279,22 @@ const ABDecisionPredictor = () => {
       
       if (data.success) {
         setResult(data.result);
+        setFeedbackRequired(true); // Require feedback after prediction
+        
+        // Add event to history
+        const newEvent = {
+          step: eventHistory.length + 1,
+          timestamp: new Date().toISOString(),
+          depth_reached: parseFloat(formData.depth_reached),
+          event_duration: parseFloat(formData.event_duration),
+          obstruction_class: formData.obstruction_class,
+          deployment_method: formData.deployment_method,
+          tools_used: [...formData.tools_used],
+          prediction: data.result.recommendation,
+          hazard_rate: data.result.hazard_rate,
+          confidence: data.result.confidence
+        };
+        setEventHistory(prev => [...prev, newEvent]);
       } else {
         setError(data.error || 'Failed to get prediction');
       }
@@ -193,6 +319,13 @@ const ABDecisionPredictor = () => {
     setResult(null);
     setError('');
     setCaseStarted(false);
+    setFeedbackRequired(false);
+    setFeedback({
+      rating: null,
+      reason: ''
+    });
+    setFeedbackError('');
+    setEventHistory([]);
   };
 
   const renderExplanation = () => {
@@ -249,6 +382,90 @@ const ABDecisionPredictor = () => {
             </button>
           </div>
         </div>
+      </div>
+    );
+  };
+
+  const renderFeedbackSection = () => {
+    if (!feedbackRequired || !result || !result.recommendation) return null;
+
+    return (
+      <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mt-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Info className="h-5 w-5 text-yellow-700" />
+          <h3 className="font-semibold text-yellow-900">Human Feedback Required</h3>
+        </div>
+        
+        <p className="text-sm text-yellow-800 mb-4">
+          Please provide feedback on this prediction before adding another event.
+        </p>
+
+        {/* Thumbs Up/Down Buttons */}
+        <div className="flex gap-3 mb-4">
+          <button
+            onClick={() => handleFeedbackRating('thumbsup')}
+            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+              feedback.rating === 'thumbsup'
+                ? 'bg-green-600 text-white shadow-lg scale-105'
+                : 'bg-white text-gray-700 border-2 border-gray-300 hover:border-green-500 hover:bg-green-50'
+            }`}
+          >
+            <ThumbsUp className={`h-5 w-5 ${feedback.rating === 'thumbsup' ? 'fill-white' : ''}`} />
+            Agree
+          </button>
+          
+          <button
+            onClick={() => handleFeedbackRating('thumbsdown')}
+            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+              feedback.rating === 'thumbsdown'
+                ? 'bg-red-600 text-white shadow-lg scale-105'
+                : 'bg-white text-gray-700 border-2 border-gray-300 hover:border-red-500 hover:bg-red-50'
+            }`}
+          >
+            <ThumbsDown className={`h-5 w-5 ${feedback.rating === 'thumbsdown' ? 'fill-white' : ''}`} />
+            Disagree
+          </button>
+        </div>
+
+        {/* Reason Input */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Reason {feedback.rating === 'thumbsdown' ? <span className="text-red-600">*</span> : <span className="text-gray-500">(Optional)</span>}
+          </label>
+          <textarea
+            value={feedback.reason}
+            onChange={handleFeedbackReason}
+            placeholder={
+              feedback.rating === 'thumbsdown'
+                ? 'Please explain why you disagree with this prediction...'
+                : 'Optional: Provide additional context or reasoning...'
+            }
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
+            rows="3"
+          />
+        </div>
+
+        {feedbackError && (
+          <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-md flex items-center text-sm">
+            <AlertCircle className="h-4 w-4 text-red-500 mr-2 flex-shrink-0" />
+            <span className="text-red-700">{feedbackError}</span>
+          </div>
+        )}
+
+        <button
+          onClick={submitFeedback}
+          disabled={loading}
+          className="w-full bg-yellow-600 text-white py-2 px-4 rounded-md hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
+        >
+          {loading ? (
+            <>
+              <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+              Submitting...
+            </>
+          ) : (
+            'Submit Feedback & Continue'
+          )}
+        </button>
       </div>
     );
   };
@@ -355,6 +572,7 @@ const ABDecisionPredictor = () => {
                             onChange={handleInputChange}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             placeholder="e.g., 1017"
+                            disabled={feedbackRequired}
                           />
                         </div>
                         
@@ -368,6 +586,7 @@ const ABDecisionPredictor = () => {
                             onChange={handleInputChange}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                             placeholder="e.g., 168 (1 week)"
+                            disabled={feedbackRequired}
                           />
                         </div>
                         
@@ -378,6 +597,7 @@ const ABDecisionPredictor = () => {
                             value={formData.obstruction_class}
                             onChange={handleInputChange}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            disabled={feedbackRequired}
                           >
                             {obstructionClasses.map(cls => (
                               <option key={cls} value={cls}>
@@ -394,6 +614,7 @@ const ABDecisionPredictor = () => {
                             value={formData.deployment_method}
                             onChange={handleInputChange}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            disabled={feedbackRequired}
                           >
                             {deploymentMethods.map(method => (
                               <option key={method} value={method}>{method}</option>
@@ -408,6 +629,7 @@ const ABDecisionPredictor = () => {
                             value={formData.confidence}
                             onChange={handleInputChange}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            disabled={feedbackRequired}
                           >
                             <option value="low">Low - Uncertain conditions</option>
                             <option value="medium">Medium - Typical conditions</option>
@@ -423,6 +645,7 @@ const ABDecisionPredictor = () => {
                     <button
                       onClick={() => toggleSection('tools')}
                       className="w-full flex items-center justify-between font-medium text-gray-700 mb-3"
+                      disabled={feedbackRequired}
                     >
                       <span>Tools Used ({formData.tools_used.length} selected)</span>
                       {expandedSections.tools ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -431,12 +654,13 @@ const ABDecisionPredictor = () => {
                     {expandedSections.tools && (
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-60 overflow-y-auto p-2">
                         {allTools.sort().map(tool => (
-                          <label key={tool} className="flex items-center text-xs hover:bg-green-100 p-1 rounded cursor-pointer">
+                          <label key={tool} className={`flex items-center text-xs hover:bg-green-100 p-1 rounded ${feedbackRequired ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
                             <input
                               type="checkbox"
                               checked={formData.tools_used.includes(tool)}
                               onChange={() => handleToolToggle(tool)}
                               className="mr-2"
+                              disabled={feedbackRequired}
                             />
                             <span>{tool}</span>
                           </label>
@@ -447,7 +671,7 @@ const ABDecisionPredictor = () => {
 
                   <button
                     onClick={addEventAndPredict}
-                    disabled={loading}
+                    disabled={loading || feedbackRequired}
                     className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
                   >
                     {loading ? (
@@ -455,10 +679,15 @@ const ABDecisionPredictor = () => {
                         <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
                         Predicting...
                       </>
+                    ) : feedbackRequired ? (
+                      <>Submit Feedback First</>
                     ) : (
                       'Add Event & Predict'
                     )}
                   </button>
+
+                  {/* Human Feedback Section */}
+                  {renderFeedbackSection()}
                 </div>
               )}
 
@@ -482,6 +711,87 @@ const ABDecisionPredictor = () => {
 
             {/* Results Panel */}
             <div className="lg:col-span-1">
+              {/* Event History */}
+              {caseStarted && eventHistory.length > 0 && (
+                <div className="mb-4">
+                  <h2 className="text-xl font-semibold text-gray-800 mb-3">Event History</h2>
+                  <div className="bg-white border border-gray-200 rounded-lg p-3 max-h-64 overflow-y-auto">
+                    <div className="space-y-2">
+                      {eventHistory.map((event, index) => (
+                        <div 
+                          key={index}
+                          className={`p-3 rounded-md border-l-4 ${
+                            event.prediction === 'ABANDON' 
+                              ? 'bg-green-50 border-green-500' 
+                              : 'bg-red-50 border-red-500'
+                          } ${index === eventHistory.length - 1 && feedbackRequired ? 'ring-2 ring-yellow-400' : ''}`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-semibold text-sm text-gray-900">Step {event.step}</span>
+                            <span className={`text-xs font-bold ${
+                              event.prediction === 'ABANDON' ? 'text-green-700' : 'text-red-700'
+                            }`}>
+                              {event.prediction === 'ABANDON' ? 'AB' : 'CONT'}
+                            </span>
+                          </div>
+                          
+                          <div className="text-xs text-gray-600 space-y-0.5">
+                            <div className="flex justify-between">
+                              <span>Depth:</span>
+                              <span className="font-medium">{event.depth_reached} ft</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Duration:</span>
+                              <span className="font-medium">{event.event_duration}h</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Tools:</span>
+                              <span className="font-medium">{event.tools_used.length}</span>
+                            </div>
+                            {event.hazard_rate !== undefined && (
+                              <div className="flex justify-between">
+                                <span>P(AB):</span>
+                                <span className="font-medium">{(event.hazard_rate * 100).toFixed(1)}%</span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {event.feedback_rating && (
+                            <div className="mt-2 pt-2 border-t border-gray-300">
+                              <div className="flex items-center gap-1 text-xs">
+                                {event.feedback_rating === 'thumbsup' ? (
+                                  <ThumbsUp className="h-3 w-3 text-green-600 fill-green-600" />
+                                ) : (
+                                  <ThumbsDown className="h-3 w-3 text-red-600 fill-red-600" />
+                                )}
+                                <span className="text-gray-700 font-medium">
+                                  {event.feedback_rating === 'thumbsup' ? 'Agreed' : 'Disagreed'}
+                                </span>
+                              </div>
+                              {event.feedback_reason && (
+                                <p className="text-xs text-gray-600 mt-1 italic">"{event.feedback_reason}"</p>
+                              )}
+                            </div>
+                          )}
+                          
+                          {index === eventHistory.length - 1 && feedbackRequired && (
+                            <div className="mt-2 pt-2 border-t border-yellow-400">
+                              <div className="text-xs text-yellow-700 font-medium flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" />
+                                Feedback pending
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs text-gray-600 text-center">
+                    Total Events: {eventHistory.length}
+                  </div>
+                </div>
+              )}
+              
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Prediction Results</h2>
               
               {result && (
