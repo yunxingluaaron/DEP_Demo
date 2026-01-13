@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: ab-predictor-backend:latest
+    container_name: ab-predictor-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - MODEL_PATH=/app/model/ab_agent_model_2.pth
+    volumes:
+      - ./backend:/app
+      - ./model:/app/model
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        REACT_APP_API_URL: http://localhost:5000  # For local development
+    image: ab-predictor-frontend:latest
+    container_name: ab-predictor-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

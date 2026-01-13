@@ -1,0 +1,40 @@
+# Frontend Dockerfile for React Application
+# Stage 1: Build the React app
+FROM node:18-alpine AS build
+
+WORKDIR /app
+
+# Copy package files
+COPY frontend/package*.json ./
+
+# Install dependencies
+RUN npm install --omit=dev
+
+# Copy the rest of the frontend code
+COPY frontend/ .
+
+# IMPORTANT: Set the API URL for production build
+# This will be baked into the React build
+ENV REACT_APP_API_URL=http://35.184.237.121:5000
+
+RUN echo "REACT_APP_API_URL is set to: $REACT_APP_API_URL"
+
+# Build the React app for production
+RUN npm run build
+
+# Debug: Check if the URL is in the bundle
+RUN grep -r "35.184.237.121" build/static/js/*.js && echo "✓ Backend URL found in build" || echo "✗ WARNING: Backend URL NOT found in build"
+
+# Stage 2: Serve with nginx
+FROM nginx:alpine
+
+# Copy the build output to nginx html directory
+COPY --from=build /app/build /usr/share/nginx/html
+
+# Copy custom nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Expose port 80
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

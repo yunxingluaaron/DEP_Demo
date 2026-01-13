@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, Play, RotateCcw, TrendingUp, X, Info, CheckCircle, XCircle, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { API_ENDPOINTS } from './config/api.prod';
+
 
 const ABDecisionPredictor = () => {
   const [formData, setFormData] = useState({
@@ -67,17 +69,33 @@ const ABDecisionPredictor = () => {
   ];
 
   useEffect(() => {
-    const checkHealth = async () => {
-      try {
-        const response = await fetch('http://localhost:5000/api/health');
-        const data = await response.json();
-        setModelInfo(data);
-      } catch (err) {
-        console.error('Health check failed:', err);
-      }
-    };
-    checkHealth();
-  }, []);
+      const checkHealth = async () => {
+        // Log the API endpoint being used
+        console.log('=== HEALTH CHECK DEBUG ===');
+        console.log('API_ENDPOINTS.HEALTH:', API_ENDPOINTS.HEALTH);
+        console.log('Full API_ENDPOINTS object:', API_ENDPOINTS);
+        console.log('Environment REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
+        console.log('=========================');
+        
+        try {
+          console.log('Attempting to fetch health endpoint...');
+          const response = await fetch(API_ENDPOINTS.HEALTH);
+          console.log('Health check response status:', response.status);
+          console.log('Health check response ok:', response.ok);
+          
+          const data = await response.json();
+          console.log('Health check data received:', data);
+          setModelInfo(data);
+          console.log('✓ Health check successful');
+        } catch (err) {
+          console.error('✗ Health check failed with error:', err);
+          console.error('Error name:', err.name);
+          console.error('Error message:', err.message);
+          console.error('Error stack:', err.stack);
+        }
+      };
+      checkHealth();
+    }, []);
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
@@ -215,7 +233,7 @@ const ABDecisionPredictor = () => {
     setError('');
     
     try {
-      const response = await fetch('http://localhost:5000/api/start-case', {
+      const response = await fetch(API_ENDPOINTS.START_CASE, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -259,7 +277,7 @@ const ABDecisionPredictor = () => {
     setError('');
     
     try {
-      const response = await fetch('http://localhost:5000/api/add-event-predict', {
+      const response = await fetch(API_ENDPOINTS.ADD_EVENT_PREDICT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

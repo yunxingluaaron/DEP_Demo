@@ -12,8 +12,16 @@ warnings.filterwarnings('ignore')
 app = Flask(__name__)
 CORS(app)
 
-# Model path
+# Model path - local deployment
 model_path = r"D:\Dropbox\29. Ampelos\28_dep\test_09_06_2025\ML_Agent_Code\ab_agent_model_2.pth"
+
+# Model path - docker and google cloud
+# Model path - read from environment variable for Docker/GKE
+MODEL_PATH = os.getenv('MODEL_PATH', '/app/model/ab_agent_model_2.pth')
+PORT = int(os.getenv('PORT', 5000))
+
+# Use the environment variable
+model_path = MODEL_PATH
 
 # Define the PyTorch model architecture (must match training)
 class ABClassifier(nn.Module):
@@ -507,7 +515,9 @@ def add_event_and_predict():
             'success': False,
             'error': f'Error processing request: {str(e)}'
         }), 500
+    
 
+## Local start ###############################################
 if __name__ == '__main__':
     print("\n" + "="*60)
     print("AB Decision Predictor Flask Backend")
@@ -521,6 +531,30 @@ if __name__ == '__main__':
         print("Starting Flask server on http://localhost:5000")
         print("="*60 + "\n")
         app.run(debug=True, host='0.0.0.0', port=5000)
+    else:
+        print("Failed to initialize predictor. Server not started.")
+        print("Please check:")
+        print("1. Model file exists at the specified path")
+        print("2. Model was trained with 55 features")
+        print("3. PyTorch is installed correctly")
+
+
+## Google Cloud Start ###############################################
+if __name__ == '__main__':
+    print("\n" + "="*60)
+    print("AB Decision Predictor Flask Backend")
+    print("Model: PyTorch ABClassifier with 55 features")
+    print("="*60)
+    print(f"Model path: {model_path}")
+    print(f"Model file exists: {os.path.exists(model_path)}")
+    print()
+    
+    if initialize_predictor():
+        # Use PORT from environment variable (for GKE/Docker)
+        print(f"Starting Flask server on http://0.0.0.0:{PORT}")
+        print("="*60 + "\n")
+        # Disable debug mode for production
+        app.run(debug=False, host='0.0.0.0', port=PORT)
     else:
         print("Failed to initialize predictor. Server not started.")
         print("Please check:")

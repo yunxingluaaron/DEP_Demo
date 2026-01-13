@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ab-predictor-backend
+  labels:
+    app: ab-predictor
+    component: backend
+spec:
+  type: LoadBalancer  # ← CHANGED
+  ports:
+  - port: 5000
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  selector:
+    app: ab-predictor
+    component: backend
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ab-predictor-frontend
+  labels:
+    app: ab-predictor
+    component: frontend
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: ab-predictor
+    component: frontend
