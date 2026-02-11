@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, Play, RotateCcw, TrendingUp, X, Info, CheckCircle, XCircle, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { AlertCircle, Play, RotateCcw, TrendingUp, X, Info, CheckCircle, XCircle, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown, Lock, LogOut } from 'lucide-react';
 import { API_ENDPOINTS } from './config/api.prod';
 
-
 const ABDecisionPredictor = () => {
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   const [formData, setFormData] = useState({
     case_id: '',
     attainable_bottom: '',
@@ -29,7 +34,7 @@ const ABDecisionPredictor = () => {
   // Human feedback state
   const [feedbackRequired, setFeedbackRequired] = useState(false);
   const [feedback, setFeedback] = useState({
-    rating: null, // 'thumbsup' or 'thumbsdown'
+    rating: null,
     reason: ''
   });
   const [feedbackError, setFeedbackError] = useState('');
@@ -68,9 +73,17 @@ const ABDecisionPredictor = () => {
     'Washover', 'Sand pump', 'Cable Tool', 'Chemical Cutter', 'Perforator'
   ];
 
+  // Check authentication on mount
   useEffect(() => {
+    const authStatus = sessionStorage.getItem('vineai_authenticated');
+    if (authStatus === 'true') {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
       const checkHealth = async () => {
-        // Log the API endpoint being used
         console.log('=== HEALTH CHECK DEBUG ===');
         console.log('API_ENDPOINTS.HEALTH:', API_ENDPOINTS.HEALTH);
         console.log('Full API_ENDPOINTS object:', API_ENDPOINTS);
@@ -95,7 +108,35 @@ const ABDecisionPredictor = () => {
         }
       };
       checkHealth();
-    }, []);
+    }
+  }, [isAuthenticated]);
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    setIsLoggingIn(true);
+    setLoginError('');
+
+    // Simulate a brief loading state for better UX
+    setTimeout(() => {
+      const correctPassword = 'DEP&PITT2026';
+      
+      if (loginPassword === correctPassword) {
+        setIsAuthenticated(true);
+        sessionStorage.setItem('vineai_authenticated', 'true');
+        setLoginPassword('');
+      } else {
+        setLoginError('Invalid password. Please try again.');
+      }
+      setIsLoggingIn(false);
+    }, 500);
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    sessionStorage.removeItem('vineai_authenticated');
+    setLoginPassword('');
+    resetForm();
+  };
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
@@ -162,11 +203,9 @@ const ABDecisionPredictor = () => {
     setLoading(true);
     setFeedbackError('');
     
-    // Simulate API call with delay
     await new Promise(resolve => setTimeout(resolve, 800));
     
     try {
-      // Store feedback data locally (dummy storage for now - backend will handle later)
       const feedbackData = {
         timestamp: new Date().toISOString(),
         case_id: formData.case_id,
@@ -180,10 +219,8 @@ const ABDecisionPredictor = () => {
         tools_used: formData.tools_used
       };
       
-      // Log to console for now (backend will store this later)
       console.log('Feedback submitted (dummy storage):', feedbackData);
       
-      // Update the last event in history with feedback
       setEventHistory(prev => {
         const updated = [...prev];
         if (updated.length > 0) {
@@ -197,15 +234,12 @@ const ABDecisionPredictor = () => {
         return updated;
       });
       
-      // Simulate successful submission
-      // Reset feedback and allow next event
       setFeedbackRequired(false);
       setFeedback({
         rating: null,
         reason: ''
       });
       
-      // Reset event form for next entry
       setFormData(prev => ({
         ...prev,
         depth_reached: '',
@@ -297,9 +331,8 @@ const ABDecisionPredictor = () => {
       
       if (data.success) {
         setResult(data.result);
-        setFeedbackRequired(true); // Require feedback after prediction
+        setFeedbackRequired(true);
         
-        // Add event to history
         const newEvent = {
           step: eventHistory.length + 1,
           timestamp: new Date().toISOString(),
@@ -418,7 +451,6 @@ const ABDecisionPredictor = () => {
           Please provide feedback on this prediction before adding another event.
         </p>
 
-        {/* Thumbs Up/Down Buttons */}
         <div className="flex gap-3 mb-4">
           <button
             onClick={() => handleFeedbackRating('thumbsup')}
@@ -445,7 +477,6 @@ const ABDecisionPredictor = () => {
           </button>
         </div>
 
-        {/* Reason Input */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Reason {feedback.rating === 'thumbsdown' ? <span className="text-red-600">*</span> : <span className="text-gray-500">(Optional)</span>}
@@ -460,6 +491,7 @@ const ABDecisionPredictor = () => {
             }
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
             rows="3"
+            
           />
         </div>
 
@@ -488,15 +520,109 @@ const ABDecisionPredictor = () => {
     );
   };
 
+  // Login Page Render
+  if (!isAuthenticated) {
+    return (
+      <div 
+        className="min-h-screen flex items-center justify-center px-4"
+        style={{
+          backgroundImage: 'url(/picture1.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        }}
+      >
+        {/* Semi-transparent overlay for better readability */}
+        <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+        
+        {/* Login Card */}
+        <div className="max-w-md w-full relative z-10">
+          <div className="bg-white rounded-2xl shadow-2xl p-8">
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
+                <Lock className="h-8 w-8 text-white" />
+              </div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">VineAI</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">Attainable Bottom AI Agent</h1>
+              <p className="text-gray-600">From University of Pittsburgh and Pennsylvania Department of Environmental Protection</p>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-6">
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                  Please Enter Access Password
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => {
+                    setLoginPassword(e.target.value);
+                    setLoginError('');
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                  placeholder="Enter password"
+                  autoFocus
+                  disabled={isLoggingIn}
+                />
+              </div>
+
+              {loginError && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
+                  <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
+                  <span className="text-red-700 text-sm">{loginError}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoggingIn || !loginPassword}
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg transition-all duration-200 flex items-center justify-center gap-2"
+              >
+                {isLoggingIn ? (
+                  <>
+                    <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                    Authenticating...
+                  </>
+                ) : (
+                  'Sign In'
+                )}
+              </button>
+            </form>
+
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <p className="text-xs text-gray-500 text-center">
+                Current Authorized personnel only. Please contact yul184@pitt.edu for access or questions.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Main Application (shown after login)
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-5xl mx-auto px-4">
-        <div className="bg-white rounded-lg shadow-lg p-6">
+    <div 
+      className="min-h-screen py-8"
+      style={{
+        backgroundImage: 'url(/picture2.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed'
+      }}
+    >
+      {/* Semi-transparent overlay for better readability */}
+      <div className="absolute inset-0 bg-white bg-opacity-30"></div>
+      
+      <div className="max-w-5xl mx-auto px-4 relative z-10">
+        <div className="bg-white bg-opacity-95 rounded-lg shadow-lg p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center">
               <TrendingUp className="h-8 w-8 text-blue-600 mr-3" />
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">VineAI-AB Decision Predictor</h1>
+                <h1 className="text-3xl font-bold text-gray-900">VineAI-AB Decision AI Agent</h1>
                 {modelInfo && (
                   <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
                     <span>Model: {modelInfo.model_type} - 55 Features</span>
@@ -509,6 +635,14 @@ const ABDecisionPredictor = () => {
                 )}
               </div>
             </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              title="Logout"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="text-sm font-medium">Logout</span>
+            </button>
           </div>
 
           {error && (
